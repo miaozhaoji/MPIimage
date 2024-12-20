@@ -9,7 +9,7 @@
 import cv2
 import numpy as np
 
-from basicsr.metrics.metric_util import reorder_image, to_y_channel
+from basicsr_local.metrics.metric_util import reorder_image, to_y_channel
 from skimage.metrics import structural_similarity
 import torch
 
@@ -356,3 +356,97 @@ def calculate_skimage_ssim_left(img1, img2):
     img1 = img1[:,64:,:3]
     img2 = img2[:,64:,:3]
     return calculate_skimage_ssim(img1=img1, img2=img2)
+
+
+
+def calculate_rmse(img, img2, crop_border, input_order='HWC', test_y_channel=False, **kwargs):
+    """Calculate PSNR (Peak Signal-to-Noise Ratio).
+
+    Ref: https://en.wikipedia.org/wiki/Peak_signal-to-noise_ratio
+
+    Args:
+        img (ndarray): Images with range [0, 255].
+        img2 (ndarray): Images with range [0, 255].
+        crop_border (int): Cropped pixels in each edge of an image. These pixels are not involved in the calculation.
+        input_order (str): Whether the input order is 'HWC' or 'CHW'. Default: 'HWC'.
+        test_y_channel (bool): Test on Y channel of YCbCr. Default: False.
+
+    Returns:
+        float: PSNR result.
+    """
+
+    assert img.shape == img2.shape, (f'Image shapes are different: {img.shape}, {img2.shape}.')
+    if input_order not in ['HWC', 'CHW']:
+        raise ValueError(f'Wrong input_order {input_order}. Supported input_orders are "HWC" and "CHW"')
+    img = reorder_image(img, input_order=input_order)
+    img2 = reorder_image(img2, input_order=input_order)
+
+    if crop_border != 0:
+        img = img[crop_border:-crop_border, crop_border:-crop_border, ...]
+        img2 = img2[crop_border:-crop_border, crop_border:-crop_border, ...]
+
+    if test_y_channel:
+        img = to_y_channel(img)
+        img2 = to_y_channel(img2)
+
+    img = img.astype(np.float64)
+    img2 = img2.astype(np.float64)
+
+    mse = np.mean((img - img2)**2)
+    
+    if mse == 0:
+        return float('inf')
+    rmse = np.sqrt(mse)
+    
+    return rmse
+
+
+
+
+
+def calculate_nrmse(img, img2, crop_border, input_order='HWC', test_y_channel=False, **kwargs):
+    """Calculate NRMSE (Normalized Root Mean Square Error).
+
+    Args:
+        img (ndarray): Images with range [0, 255].
+        img2 (ndarray): Images with range [0, 255].
+        crop_border (int): Cropped pixels in each edge of an image. These pixels are not involved in the calculation.
+        input_order (str): Whether the input order is 'HWC' or 'CHW'. Default: 'HWC'.
+        test_y_channel (bool): Test on Y channel of YCbCr. Default: False.
+
+    Returns:
+        float: NRMSE result.
+    """
+
+    assert img.shape == img2.shape, (f'Image shapes are different: {img.shape}, {img2.shape}.')
+    if input_order not in ['HWC', 'CHW']:
+        raise ValueError(f'Wrong input_order {input_order}. Supported input_orders are "HWC" and "CHW"')
+    img = reorder_image(img, input_order=input_order)
+    img2 = reorder_image(img2, input_order=input_order)
+
+    if crop_border != 0:
+        img = img[crop_border:-crop_border, crop_border:-crop_border, ...]
+        img2 = img2[crop_border:-crop_border, crop_border:-crop_border, ...]
+
+    if test_y_channel:
+        img = to_y_channel(img)
+        img2 = to_y_channel(img2)
+
+    img = img.astype(np.float64)
+    img2 = img2.astype(np.float64)
+
+    mse = np.mean((img - img2)**2)
+    
+    if mse == 0:
+        return float('inf')
+    rmse = np.sqrt(mse)
+    
+    # Calculate the range of the image
+    img_range = np.max(img) - np.min(img)
+    
+    if img_range == 0:
+        return float('inf')
+    
+    nrmse = rmse / img_range
+    
+    return nrmse
